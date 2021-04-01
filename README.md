@@ -37,19 +37,19 @@ python DatasetPrepare.py
 ### Run Code
 1, For Training from scratch
 ```
-python main.py /path/data/ LungBline (if entre "python main.py /path/data/ ", UCF101 dataset is used by default)
+python main.py /path/data 
 ```
 2, For Fine-tuning
 ```
-python main.py /path/data/ --pretrained LungBline
+python main.py /path/data --pretrained
 ```
 3, For Evaluate model
 ```
-python main.py /path/data/ --resume=checkpoint.pth.tar --evaluate LungBline
+python main.py /path/data --resume=checkpoint.pth.tar --evaluate 
 ```
 4, For testing model
 ```
-python main.py /path/data/ --test LungBline
+python main.py /path/data --test 
 ```
 
 ### Experiment Result From Us
