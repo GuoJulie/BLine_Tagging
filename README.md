@@ -27,10 +27,6 @@ This repo implements the network structure of P3D[1] with PyTorch, pre-trained m
 ### Prepare Dataset LungBline
 First, download the dataset DICOM "Centre 1 Tours" from ??? into the "Dataset" folder.
 
-Next, make 3 folders train, test and validation:
-```
-mkdir train test validation
-```
 Next run scripts in the folder "DatasetTraitement" to create dataset LungBline 
 dataset: LungBine (video: folder - "LungBline", list: folder - lungblineTrainTestlist)
 and extract image frames from videos (folder - Data);
