@@ -61,3 +61,4 @@ UCF-101 | 81.6%
 Reference:
 
  [1][Learning Spatio-Temporal Representation with Pseudo-3D Residual,ICCV2017](http://openaccess.thecvf.com/content_iccv_2017/html/Qiu_Learning_Spatio-Temporal_Representation_ICCV_2017_paper.html)
+ [2][pseudo-3d-pytorch](https://github.com/naviocean/pseudo-3d-pytorch)
