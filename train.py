@@ -1,27 +1,35 @@
 from __future__ import print_function
+
 import os
 import os.path
 import shutil
 import time
+
 import torch.backends.cudnn as cudnn
 import torch.nn as nn
 import torch.nn.parallel
 import torch.optim as optim
 import torch.utils.data as data
-from meter import AverageMeter
+
+from Dataset import MyDataset
 from logger import Logger
+from lr_scheduler import CyclicLR
+from meter import AverageMeter
+from somemodels import p3d_model
+from somemodels.p3d_model import *
+from somemodels.C3D import C3D
+from somemodels.i3dpt import I3D
 # from video_transforms import *
 from transforms import *
-from Dataset import MyDataset
-from models.p3d_model import P3D199, get_optim_policies
-from models.C3D import C3D
-from models.i3dpt import I3D
+from main import *
 from utils import check_gpu, transfer_model, accuracy, get_learning_rate
 from visualize import Visualizer
-from lr_scheduler import CyclicLR
+import matplotlib.pyplot as plt
+
 
 class Training(object):
-    def __init__(self, name_list, num_classes=400, modality='RGB', **kwargs):
+
+    def __init__(self, name_list, num_classes, modality='RGB', **kwargs):
         self.__dict__.update(kwargs)
         self.num_classes = num_classes
         self.modality = modality
@@ -32,6 +40,11 @@ class Training(object):
         self.best_prec1 = 0
         # init start epoch = 0
         self.start_epoch = 0
+
+        self.Train_Accuracy_list = []
+        self.Train_Loss_list = []
+        self.Val_Accuracy_list = []
+        self.Val_Loss_list = []
 
         if self.log_visualize != '':
             self.visualizer = Visualizer(logdir=self.log_visualize)
@@ -63,6 +76,10 @@ class Training(object):
             exit()
 
     def checkDataFolder(self):
+        '''
+        Create a folder to store the trained model, generated log, image of learning curve etc ,.
+        :return:
+        '''
         try:
             os.stat('./' + self.model_type + '_' + self.data_set)
         except:
@@ -99,18 +116,18 @@ class Training(object):
         self.model = transfer_model(model=self.model, model_type=self.model_type, num_classes=self.num_classes)
 
         # Check gpu and run parallel
-        if check_gpu() > 0:
-            self.model = torch.nn.DataParallel(self.model).cuda()
+        # if check_gpu() > 0:
+        #     self.model = torch.nn.DataParallel(self.model)
 
         # define loss function (criterion) and optimizer
         self.criterion = nn.CrossEntropyLoss()
 
-        if check_gpu() > 0:
-            self.criterion = nn.CrossEntropyLoss().cuda()
+        # if check_gpu() > 0:
+        #     self.criterion = nn.CrossEntropyLoss()
 
         params = self.model.parameters()
         if self.model_type == 'P3D':
-            params = get_optim_policies( model=self.model, modality=self.modality, enable_pbn=True)
+            params = p3d_model.get_optim_policies( model=self.model, modality=self.modality, enable_pbn=True)
 
         self.optimizer = optim.SGD(params=params, lr=self.lr, momentum=self.momentum, weight_decay=self.weight_decay)
 
@@ -151,6 +168,7 @@ class Training(object):
     def loading_data(self):
         random = True if self.random else False
         size = 160
+        # size = 300
         if self.model_type == 'C3D':
             size = 112
         if self.model_type == 'I3D':
@@ -178,7 +196,7 @@ class Training(object):
             normalize
         ])
 
-        train_dataset = MyDataset(
+        self.train_dataset = MyDataset(
             self.data,
             data_folder="train",
             name_list=self.name_list,
@@ -198,8 +216,9 @@ class Training(object):
             random=random
         )
 
+        # Combines a dataset and a sampler, and provides an iterable over the given dataset.
         train_loader = data.DataLoader(
-            train_dataset,
+            self.train_dataset,
             batch_size=self.batch_size,
             shuffle=True,
             num_workers=self.workers,
@@ -214,6 +233,7 @@ class Training(object):
 
         return (train_loader, val_loader)
 
+    # run (Start learning and validating, then export the results to "train.log" and show the learning curve)
     def processing(self):
         log_file = os.path.join(self.data_folder, 'train.log')
 
@@ -227,9 +247,9 @@ class Training(object):
             self.validate(logger)
             return
 
-        iter_per_epoch = len(self.train_loader)
-        logger.info('Iterations per epoch: {0}'.format(iter_per_epoch))
-        print('Iterations per epoch: {0}'.format(iter_per_epoch))
+        self.iter_per_epoch = len(self.train_loader)
+        logger.info('Iterations per epoch: {0}'.format(self.iter_per_epoch))
+        print('Iterations per epoch: {0}'.format(self.iter_per_epoch))
 
         start_time = time.time()
 
@@ -238,10 +258,14 @@ class Training(object):
 
             # train for one epoch
             train_losses, train_acc = self.train(logger, epoch)
+            print("*********** train_acc.avg: ", train_acc.avg)
+            print("*********** train_losses.avg: ", train_losses.avg)
 
             # evaluate on validation set
             with torch.no_grad():
                 val_losses, val_acc = self.validate(logger)
+                print("*********** val_acc.avg: ", val_acc.avg)
+                print("*********** val_losses.avg: ", val_losses.avg)
 
             # self.scheduler.step(val_losses.avg)
             # log visualize
@@ -249,11 +273,19 @@ class Training(object):
             info_loss = {'train_loss': train_losses.avg, 'val_loss': val_losses.avg}
             self.visualizer.write_summary(info_acc, info_loss, epoch + 1)
 
+            # print("+++++++iter_per_epoch: ",self.iter_per_epoch)
+            # print("+++++++len(self.train_dataset): ",len(self.train_dataset))
+            self.Train_Accuracy_list.append(train_acc.avg)
+            self.Train_Loss_list.append(train_losses.avg)
+            self.Val_Accuracy_list.append(val_acc.avg)
+            self.Val_Loss_list.append(val_losses.avg)
+
             self.visualizer.write_histogram(model=self.model, step=epoch + 1)
 
             # remember best Accuracy and save checkpoint
             is_best = val_acc.avg > self.best_prec1
             self.best_prec1 = max(val_acc.avg, self.best_prec1)
+            print("Best Accuracy: ", self.best_prec1)
             self.save_checkpoint({
                 'epoch': epoch + 1,
                 'state_dict': self.model.state_dict(),
@@ -270,7 +302,9 @@ class Training(object):
                     (end_time - start_time))
         self.visualizer.writer_close()
 
-    # Training
+        self.courbe()
+
+    # Training (Train the model, measure the precision and record the loss, print the results on the command line of the terminal)
     def train(self, logger, epoch):
         batch_time = AverageMeter()
         data_time = AverageMeter()
@@ -290,9 +324,9 @@ class Training(object):
 
             # measure data loading time
             data_time.update(time.time() - end)
-            if check_gpu() > 0:
-                images = images.cuda(async=True)
-                target = target.cuda(async=True)
+            # if check_gpu() > 0:
+            #     images = images
+            #     target = target
             image_var = torch.autograd.Variable(images)
             label_var = torch.autograd.Variable(target)
 
@@ -300,12 +334,17 @@ class Training(object):
 
             # compute y_pred
             y_pred = self.model(image_var)
+            # print("-----y_pred.shape:-----", y_pred.shape)
             if self.model_type == 'I3D':
                 y_pred = y_pred[0]
 
             loss = self.criterion(y_pred, label_var)
             # measure accuracy and record loss
-            prec1, prec5 = accuracy(y_pred.data, target, topk=(1, 5))
+            if self.num_classes<=5:
+                topkmax = self.num_classes
+            else:
+                topkmax = 5
+            prec1, prec5 = accuracy(y_pred.data, target, topk=(1, topkmax))
             losses.update(loss.item(), images.size(0))
             acc.update(prec1.item(), images.size(0))
             top1.update(prec1.item(), images.size(0))
@@ -326,7 +365,7 @@ class Training(object):
                       'Lr {rate:.5f}\t'
                       'Loss {loss.val:.4f} ({loss.avg:.4f})\t'
                       'Prec@1 {top1.val:.3f} ({top1.avg:.3f})\t'
-                      'Prec@5 {top5.val:.3f} ({top5.avg:.3f})'.format(epoch, self.epochs, i, len(self.train_loader),
+                      'Prec@4 {top5.val:.3f} ({top5.avg:.3f})'.format(epoch, self.epochs, i, len(self.train_loader),
                                                                       batch_time=batch_time, data_time=data_time,
                                                                       rate=rate,
                                                                       loss=losses, top1=top1, top5=top5))
@@ -337,7 +376,7 @@ class Training(object):
                     'Lr {rate:.5f}\t'
                     'Loss {loss.val:.4f} ({loss.avg:.4f})\t'
                     'Prec@1 {top1.val:.3f} ({top1.avg:.3f})\t'
-                    'Prec@5 {top5.val:.3f} ({top5.avg:.3f})'.format(epoch, self.epochs, batch_time=batch_time,
+                    'Prec@4 {top5.val:.3f} ({top5.avg:.3f})'.format(epoch, self.epochs, batch_time=batch_time,
                                                                     data_time=data_time, rate=rate, loss=losses,
                                                                     top1=top1,
                                                                     top5=top5))
@@ -355,9 +394,9 @@ class Training(object):
 
         end = time.time()
         for i, (images, labels) in enumerate(self.val_loader):
-            if check_gpu() > 0:
-                images = images.cuda(async=True)
-                labels = labels.cuda(async=True)
+            # if check_gpu() > 0:
+            #     images = images
+            #     labels = labels
 
             image_var = torch.autograd.Variable(images)
             label_var = torch.autograd.Variable(labels)
@@ -370,7 +409,11 @@ class Training(object):
             loss = self.criterion(y_pred, label_var)
 
             # measure accuracy and record loss
-            prec1, prec5 = accuracy(y_pred.data, labels, topk=(1, 5))
+            if self.num_classes<=5:
+                topkmax = self.num_classes
+            else:
+                topkmax = 5
+            prec1, prec5 = accuracy(y_pred.data, labels, topk=(1, topkmax))
             losses.update(loss.item(), images.size(0))
             acc.update(prec1.item(), images.size(0))
             top1.update(prec1.item(), images.size(0))
@@ -384,7 +427,7 @@ class Training(object):
                       'Time {batch_time.val:.3f} ({batch_time.avg:.3f})\t'
                       'Loss {loss.val:.4f} ({loss.avg:.4f})\t'
                       'Prec@1 {top1.val:.3f} ({top1.avg:.3f})\t'
-                      'Prec@5 {top5.val:.3f} ({top5.avg:.3f})'.format(
+                      'Prec@4 {top5.val:.3f} ({top5.avg:.3f})'.format(
                     i, len(self.val_loader), batch_time=batch_time, loss=losses, top1=top1, top5=top5))
 
         print(
@@ -412,3 +455,52 @@ class Training(object):
         for param_group in self.optimizer.param_groups:
             param_group['lr'] = lr * param_group['lr_mult']
             param_group['weight_decay'] = decay * param_group['decay_mult']
+
+    # courbe d'apprentissage(acc et loss)
+    def courbe(self):
+        x_epochs = range(0, self.epochs)
+        y_train_acc = self.Train_Accuracy_list
+        y_val_acc = self.Val_Accuracy_list
+        y_train_loss = self.Train_Loss_list
+        y_val_loss = self.Val_Loss_list
+        print("x_epochs: ", x_epochs)
+        print("y_train_acc: ", y_train_acc)
+        print("y_val_acc: ", y_val_acc)
+        print("y_train_loss: ", y_train_loss)
+        print("y_val_loss: ", y_val_loss)
+
+        # plt.title('Accuracy and Loss')
+        # plt.plot(x_epochs, y_train_acc, 'red', label='Training acc')
+        # plt.plot(x_epochs, y_val_acc, 'orange', label='Validation acc')
+        # plt.plot(x_epochs, y_train_loss, 'blue', label='Training loss')
+        # plt.plot(x_epochs, y_val_loss, 'green', label='Validation loss')
+        # plt.legend()
+        #
+        # # for xy in zip(x_epochs, y_val_acc):
+        # #     plt.annotate("(%s,%s)" % xy, xy=xy, xytext=(-20, 10), textcoords='offset points')
+        #
+        # plt.xlim(0, 9)
+        # plt.ylim(0, 100)
+
+        plt.subplot(2, 1, 1)
+        plt.title('Accuracy and Loss')
+        plt.plot(x_epochs, y_train_acc, 'red', label='Training acc')
+        plt.plot(x_epochs, y_val_acc, 'orange', label='Validation acc')
+        plt.ylabel('Accuracy')
+        plt.xlim(0, 9)
+        # plt.ylim(0, 100)
+        plt.legend()
+
+        plt.subplot(2, 1, 2)
+        plt.plot(x_epochs, y_train_loss, 'blue', label='Training loss')
+        plt.plot(x_epochs, y_val_loss, 'green', label='Validation loss')
+        plt.ylabel('Loss')
+        plt.xlim(0, 9)
+        # plt.ylim(0, 100)
+        plt.legend()
+
+        plt.xlabel('Epochs')
+
+        plt.savefig("accuracy_loss.jpg")
+        plt.show()
+

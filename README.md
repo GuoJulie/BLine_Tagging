@@ -55,7 +55,7 @@ python main.py /path/data/ --test LungBline
 ### Experiment Result From Us
 Dataset | Accuracy
 ---|---|
-LungBline | ?
+LungBline | 54.93%
 UCF-101 | 81.6%
 
 Reference:

@@ -20,8 +20,8 @@ import glob
 class DatasetPrepare:
 
     '''
-    根据Excel数据文件读取"Centre 1 Tours"文件下的数据，
-    并处理成 LungBline数据集 和 lungblineTrainTestlist分类训练测试txt文件
+    Read the data in the "Centre 1 Tours" folder according to the Excel data file,
+    And process into LungBline dataset and lungblineTrainTestlist folder(trainlist + testlist)
     '''
 
     def __init__(self,path_dataFolder, excel_path, DEBUG=False):
@@ -37,9 +37,13 @@ class DatasetPrepare:
 
                 self.DataArbreWrite()
 
-            except Exception as e: # 稍后测试
-                print('数据库准备失败，进程终止')
-                # 按 classInd的顺序将 Bline0?0?中的视频路径 写入 trainlist / testlist
+                # self.get_train_test_lists()
+
+                # self.videoToImage()
+
+            except Exception as e:
+                print('The database preparation failed and the process was terminated')
+                # Write the video path in Bline0?0? into trainlist.txt / testlist.txt in the order of classInd
                 for n in range(len(self.list_path)):
                     with open(self.list_path[n], mode='a+', encoding='utf-8') as f:
                         for i in self.traintestlist[n]:
@@ -49,92 +53,102 @@ class DatasetPrepare:
 
             self.get_train_test_lists()
 
-            self.videoToImage(True)
+            self.videoToImage()
 
 
 
-    # 读取"baseAnnotéeWorkBook.xlsx"数据文件
     def xlsxRead(self,excel_path):
+        '''
+        Read the "baseAnnotéeWorkBook.xlsx" data file
+        :param excel_path: path of data excel (note the number of B lines for each dicom file)
+            (here is path of "centre 1 tours")
+        :return:
+        '''
         print("--------------Fonc: xlsxRead--------------")
 
         try:
-            excelData = pd.read_excel(excel_path,1) # 读取第二个工作表中的数据
+            excelData = pd.read_excel(excel_path,1) # Read the data in the second worksheet
         except Exception as e:
-            print('文件打开失败')
+            print('File open failed')
             return e
         else:
             sheet_names = list(excelData.keys())
             sheet_define = ['Patient', 'Exam', 'File Name', 'Irrégularité ligne pleurale',
            'Nb lignes B', 'Score CPI', 'Opérateur']
             if sheet_names != sheet_define:
-                print("数据表格式不正确，请参考示例数据表")
+                print("The format of the data table is incorrect, please refer to the example data table 'baseAnnotéeWorkBook.xlsx'")
             else:
                 print("sheet_name: ", sheet_names)
                 self.xisxlist = excelData.values
                 n_xisxlist = len(self.xisxlist)
-                print("可用数据总数：", n_xisxlist)
+                print("Total available data：", n_xisxlist)
                 print("ex(xisxlist[0]): ", self.xisxlist[0])
 
                 if n_xisxlist % TestPointBase != 0:
-                    print("病人测试点数据总数不正确，不是TestPointBase的倍数（测试一次产生TestPointBase个测试数据）,请修改xlsx文件")
+                    print("The total number of test point data of patient is incorrect, not a multiple of 'TestPointBase' ('TestPointBase' data is generated at a time test), please modify the xlsx file")
                 else:
                     n_patient = int(n_xisxlist/TestPointBase)
-                    print("病人总数：", n_patient)
+                    print("Total number of patients：", n_patient)
 
                     self.n_trainPatient = int(math.ceil(n_patient * RadioTrainTest))
                     self.n_testPatient = n_patient - self.n_trainPatient
-                    print("训练集病人数：", self.n_trainPatient)
-                    print("测试集病人数：", self.n_testPatient)
+                    print("Number of patients in training set：", self.n_trainPatient)
+                    print("Number of patients in testing set：", self.n_testPatient)
 
 
 
     def DataArbreCreate(self,path_dataFolder):
+        '''
+        Create some necessary directories and files (the default is initially empty)
+        :param path_dataFolder: path of folder DICOM (here is path of "centre 1 tours")
+        :return:
+        '''
         print("--------------Fonc: DataArbreCreate--------------")
 
         self.classInd = ['Bline0104', 'Bline0507', 'Bline0810', 'BlineBlanc']
         self.traintestlist = [[[], [], [], []],
-                              [[], [], [], []]]  # [trainlist, testlist] 有classInd
+                              [[], [], [], []]]  # [trainlist, testlist] have 'classInd'
 
         self.path_dataFolder = path_dataFolder
         path_parent = os.path.dirname(self.path_dataFolder)
 
         folder_names = ["LungBline", "Data", "lungblineTrainTestlist" ]
 
-        path_LungBline = path_parent + "/" + folder_names[0] # 目录：LungBline
-        path_Data = path_parent + "/" + folder_names[1] # 目录：Data
-        path_lungblineTrainTestlist = path_parent + "/" + folder_names[2] # 目录：lungblineTrainTestlist
+        path_LungBline = path_parent + "/" + folder_names[0] # LungBline
+        path_Data = path_parent + "/" + folder_names[1] # Data
+        path_lungblineTrainTestlist = path_parent + "/" + folder_names[2] # lungblineTrainTestlist
         folder_groups = [path_LungBline, path_Data, path_lungblineTrainTestlist]
 
-        # 创建文件夹： LungBline, Data, lungblineTrainTestlist
+        # Create a folder: LungBline, Data, lungblineTrainTestlist
         for i in range(len(folder_groups)):
             if not os.path.exists(folder_groups[i]):
                 os.makedirs(folder_groups[i])
-                print("文件夹 /" + folder_names[i] + " 创建成功")
+                print("folder: /" + folder_names[i] + " is created successfully")
 
-        # 创建文件夹： Data/train, Data/test
+        # Create a folder: Data/train, Data/test
         data_folder_groups = ["train", "test"]
         for i in data_folder_groups:
             path_folder_groups = folder_groups[1] + "/" + i
             if not os.path.exists(path_folder_groups):
                 os.makedirs(path_folder_groups)
-                print("文件夹 /" + folder_names[1] + "/" + i + " 创建成功")
+                print("folder: /" + folder_names[1] + "/" + i + " is created successfully")
 
-        # 创建文件夹： LungBline/Bline0?0?
+        # Create a folder: LungBline/Bline0?0?
         for i in self.classInd:
             path_Bline = folder_groups[0] + "/" + str(i)
             if not os.path.exists(path_Bline):
                 os.makedirs(path_Bline)
-                print("文件夹 /" + folder_names[0] + "/" + str(i) + " 创建成功")
+                print("folder: /" + folder_names[0] + "/" + str(i) + " is created successfully")
 
-        # 创建文件夹： Data/train/Bline0?0?, Data/test/Bline0?0?
+        # Create a folder: Data/train/Bline0?0?, Data/test/Bline0?0?
         for i in self.classInd:
             for j in data_folder_groups:
                 path_Bline = folder_groups[1] + "/" + j + "/" + str(i)
                 if not os.path.exists(path_Bline):
                     os.makedirs(path_Bline)
-                    print("文件夹 /" + folder_names[1] + "/" + j + "/" + str(i) + " 创建成功")
+                    print("folder: /" + folder_names[1] + "/" + j + "/" + str(i) + " is created successfully")
 
-        # 创建txt文件： lungblineTrainTestlist/classInd.txt
+        # Create a txt file: lungblineTrainTestlist/classInd.txt
         path_classInd = path_lungblineTrainTestlist + "/" + "classInd.txt"
         if not os.path.exists(path_classInd):
             with open(path_classInd, mode='w', encoding='utf-8') as f:
@@ -142,33 +156,31 @@ class DatasetPrepare:
                 for i in self.classInd:
                     f.write(str(j) + ' ' + i + '\n')
                     j = j + 1
-            print("/" + folder_names[0] + "/classInd.txt 写入成功")
+            print("/" + folder_names[0] + "/classInd.txt is written successfully")
 
-        # 创建txt文件： lungblineTrainTestlist/trainlist.txt, lungblineTrainTestlist/testlist.txt
+        # Create a txt file: lungblineTrainTestlist/trainlist.txt, lungblineTrainTestlist/testlist.txt
         path_trainlist = path_lungblineTrainTestlist + "/" + "trainlist.txt"
         path_testlist = path_lungblineTrainTestlist + "/" + "testlist.txt"
         self.list_path = [path_trainlist, path_testlist]
         for i in range(len(self.list_path)):
             if not os.path.exists(self.list_path[i]):
                 with open(self.list_path[i], mode='w', encoding='utf-8') as f:
-                    print("/" + folder_names[2] + "/" + os.path.split(self.list_path[i])[1] + " 创建成功")
+                    print("/" + folder_names[2] + "/" + os.path.split(self.list_path[i])[1] + " is created successfully")
             else:
-                # 读取 trainlist.txt 和 testlist.txt 中的数据 到 traintestlist 中
+                # Read the data in trainlist.txt and testlist.txt to traintestlist
                 with open(self.list_path[i], "r+") as f:
                     for line in f:
                         classid, path_video = os.path.split(line)
                         self.traintestlist[i][self.classInd.index(classid)].append(line.strip('\n'))
                     f.seek(0)
-                    f.truncate()  # 清空文件
-
-
+                    f.truncate()  # clear data in txt
 
 
 
 
     def DataArbreWrite(self):
         '''
-        将获取的已剪切视频存放到 对应的Bline0?0?文件夹 中
+        Store the obtained cut video in the corresponding Bline0?0? folder
         :return:
         '''
         print("--------------Fonc: DataArbreWrite--------------")
@@ -193,13 +205,13 @@ class DatasetPrepare:
                 else:
                     tempPath = tempPath + "/1" + "020" + i[1]  # eg: /Centre 1 Tours/22Patient 1BA22/1020M0
 
-                # print("父路径",tempPath)
+                # print("parent path: ",tempPath)
 
                 if os.path.exists(tempPath):
-                    files = os.listdir(tempPath) # 获取当前文件夹下所有文件（夹）
+                    files = os.listdir(tempPath) # Get all files (folders) in the current folder
 
-                    for file in files:  # 遍历文件夹
-                        if os.path.isdir(tempPath + "/" + file):  # 判断是否是文件夹，是文件夹则进入
+                    for file in files:  # Traverse folders
+                        if os.path.isdir(tempPath + "/" + file):  # Determine whether it is a folder, enter it if it is a folder
                             tempPath = tempPath + "/" + file + "/" + i[2] # eg: /Centre 1 Tours/23Patient 1RM23/1020M0/201906/20190104
                         else:
                             tempPath = tempPath + "/" + i[2] # eg: /Centre 1 Tours/1Patient 1CP01/101M0/2019010C
@@ -207,12 +219,12 @@ class DatasetPrepare:
                         if os.path.exists(tempPath):
                             self.inputPath_DICOM = tempPath
 
-                            print("inputPath_DICOM - 最终路径",self.inputPath_DICOM)
+                            print("inputPath_DICOM : ",self.inputPath_DICOM)
 
 
                 path_LungBline = os.path.dirname(self.path_dataFolder) + "/" + "LungBline"
-                tempnamelist = [i[0], i[1], i[2]]
-                # 根据“Nb lignes B”判断 classID
+                tempnamelist = [i[0].split( )[0] + "_" + i[0].split( )[1], i[1], i[2]]
+                # Judge the classID according to "Nb lignes B"
                 if(self.isDigit(i[4]) == False):
                     index = 3
                 elif (int(i[4]) <= 4):
@@ -224,9 +236,8 @@ class DatasetPrepare:
 
                 self.outputPath_VideoCut = path_LungBline + "/" + self.classInd[index]
                 n_gBline[index] = n_gBline[index] + 1
-                print("outputPath_VideoCut - 最终路径", self.outputPath_VideoCut)
+                print("outputPath_VideoCut : ", self.outputPath_VideoCut)
 
-                # videoname = os.path.split(self.outputPath_VideoCut)[1] +
                 tempstr = tempnamelist[0] + "_" + tempnamelist[1] + "_" + tempnamelist[2]
                 n_count = sum([k.count(tempstr)
                          for i in self.traintestlist
@@ -240,20 +251,23 @@ class DatasetPrepare:
                         for k in j:
                             # if k != None:
                                 print(k)
-                print("查找：",n_count)
+                print("Find n_count = ：",n_count)
                 if (n_count == 0):
                     reader = DICOMReader(self.inputPath_DICOM, self.outputPath_VideoCut, n_gBline[index], tempnamelist, True)
-                    print(str(self.classInd[index]) + ": DICOM 转换 AVI 成功")
+                    print(str(self.classInd[index]) + ": DICOM converted AVI successfully")
 
                     for i in range(len(reader.videonamelist)):
                         print("******: ", i)
                         if (count <= self.n_trainPatient * TestPointBase):
-                            self.traintestlist[0][index].append(reader.videonamelist[i])
+                            # self.traintestlist[0][index].append(reader.videonamelist[i])
+                            self.traintestlist[0][index].append(reader.videonamelist[i] + " " + str(1 + self.classInd.index(os.path.split(reader.videonamelist[i])[0])))
                         else:
                             self.traintestlist[1][index].append(reader.videonamelist[i])
+                            # self.traintestlist[1][index].append(reader.videonamelist[i] + " " + str(1 + self.classInd.index(os.path.split(reader.videonamelist[i])[1])))
 
 
-        # 按 classInd的顺序将 Bline0?0?中的视频路径 写入 trainlist / testlist
+
+        # Write the video path in Bline0?0? into trainlist.txt / testlist.txt in the order of classInd
         for n in range(len(self.list_path)):
             with open(self.list_path[n], mode='a+', encoding='utf-8') as f:
                 for i in self.traintestlist[n]:
@@ -264,7 +278,7 @@ class DatasetPrepare:
 
     def isDigit(self,x):
         '''
-        判断 xlsx文件 中“Nb lignes B”列 的数据是否为 "#N/A"
+        Determine whether the data in the "Nb lignes B" column in the xlsx file is "#N/A"
         :param x: self.xisxlist[i][4]
         :return: int(x) / False
         '''
@@ -277,21 +291,27 @@ class DatasetPrepare:
 
     def get_train_test_lists(self):
 
-        # 读取 trainlist.txt 和 testlist.txt 中的数据 到 train_test_list 中
-        self.train_test_list = [[], []] # [trainlist,testlist] 每个字符串末尾没有classId
+        # Read the data in trainlist.txt and testlist.txt to train_test_list
+        self.train_test_list = [[], []] # [trainlist,testlist] --> No classId at the end of each string
         path_LungBline = os.path.dirname(self.path_dataFolder) + "/" + "LungBline"
         for i in range(len(self.list_path)):
-            with open(self.list_path[i], "r+") as f:
-                # train 和 test 的 video path
-                self.train_test_list[i] = [path_LungBline + "/" + re.split('\d+$', row.strip())[0].strip() for row in list(f)]
+            if(i == 0):
+                with open(self.list_path[i], "r+") as f:
+                    # video path in train and test list
+                    self.train_test_list[i] = [path_LungBline + "/" + re.split('\d+$', row.strip())[0].strip() for row in list(f)]
+                    print("1. ++++++++++++", self.train_test_list[i])
+            else:
+                with open(self.list_path[i], "r+") as f:
+                    # video path in train and test list
+                    self.train_test_list[i] = [path_LungBline + "/" + row.strip() for row in list(f)]
 
-        # Set the groups in a dictionary.
-        file_groups = {
-            'train': self.train_test_list[0],
-            'test': self.train_test_list[1]
-        }
+        # # Set the groups in a dictionary.
+        # file_groups = {
+        #     'train': self.train_test_list[0],
+        #     'test': self.train_test_list[1]
+        # }
 
-        # 打印 video path
+        # print video path
         for i in self.train_test_list:
             print("+++++++++++++++++++++++++++++++++++++++++++++++++")
             for j in i:
@@ -300,15 +320,17 @@ class DatasetPrepare:
 
 
 
-    def videoToImage(self, DEBUG=False):
+    def videoToImage(self):
+        '''
+        Convert the videos in the "LungBline" folder into pictures
+        and store them in the corresponding train and test folders under the folder Data,
+        and create a data_file.csv file
+        :return:
+        '''
         print("-------------------Fonc: videoToImage-------------------")
 
-        # 视频路径有了
-        # train / test 文件夹 有了
-
-        # 这是 Data的绝对路径
         path_parent = os.path.dirname(self.path_dataFolder)
-        path_Data = path_parent + "/" + "Data"  # 目录：Data
+        path_Data = path_parent + "/" + "Data"  # Data
 
         data_file = []
         folders = [path_Data + '/train', path_Data + '/test']
@@ -322,7 +344,7 @@ class DatasetPrepare:
                     outputFolder_Image = folders[i] + "/" + folderclassId + "/" + str(videoname)
                     if not os.path.exists(outputFolder_Image):
                         os.makedirs(outputFolder_Image)
-                        print("文件夹 " + outputFolder_Image + " 创建成功")
+                        print("folder : " + outputFolder_Image + " is created successfully")
 
                         # Now extract it.
                         call(["ffmpeg", "-i", j, outputFolder_Image + "/" + str(videoname) + "-%04d.jpg"])

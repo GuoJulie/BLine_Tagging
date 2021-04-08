@@ -12,10 +12,11 @@ from meter import AverageMeter
 from logger import Logger
 # from video_transforms import *
 from transforms import *
+from main import *
 from Dataset import MyDataset
-from models.p3d_model import P3D199, get_optim_policies
-from models.C3D import C3D
-from models.i3dpt import I3D
+from somemodels.p3d_model import P3D199, get_optim_policies
+from somemodels.C3D import C3D
+from somemodels.i3dpt import I3D
 from utils import check_gpu, transfer_model, accuracy
 
 class Testing(object):
@@ -63,14 +64,15 @@ class Testing(object):
         self.model = transfer_model(model=self.model, model_type=self.model_type, num_classes=self.num_classes)
 
         # Check gpu and run parallel
-        if check_gpu() > 0:
-            self.model = torch.nn.DataParallel(self.model).cuda()
+        # if check_gpu() > 0:
+        #     self.model = torch.nn.DataParallel(self.model)
 
         # define loss function (criterion) and optimizer
-        if check_gpu() > 0:
-            self.criterion = nn.CrossEntropyLoss().cuda()
-        else:
-            self.criterion = nn.CrossEntropyLoss()
+        # if check_gpu() > 0:
+        #     self.criterion = nn.CrossEntropyLoss()
+        # else:
+        #     self.criterion = nn.CrossEntropyLoss()
+        self.criterion = nn.CrossEntropyLoss()
 
         policies = get_optim_policies(model=self.model, modality=self.modality, enable_pbn=True)
 
@@ -101,6 +103,7 @@ class Testing(object):
             size = 224
         normalize = Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
 
+        # load the transformer
         val_transformations = Compose([
             Resize((size, size)),
             ToTensor(),
@@ -115,6 +118,8 @@ class Testing(object):
             transform=val_transformations,
             num_frames=self.num_frames
         )
+        self.label_dict = test_dataset.label_dict
+        self.video_dict = test_dataset.video_dict
 
         test_loader = data.DataLoader(
             test_dataset,
@@ -127,6 +132,7 @@ class Testing(object):
 
     # Test
     def process(self):
+        self.classes = []
         acc = AverageMeter()
         top1 = AverageMeter()
         top5 = AverageMeter()
@@ -139,19 +145,31 @@ class Testing(object):
         start_time = time.clock()
         print("Begin testing")
         for i, (images, labels) in enumerate(self.test_loader):
-            if check_gpu() > 0:
-                images = images.cuda(async=True)
-                labels = labels.cuda(async=True)
+            # if check_gpu() > 0:
+            #     images = images
+            #     labels = labels
 
+            # print("-----labels: -----", labels)
             image_var = torch.autograd.Variable(images)
             label_var = torch.autograd.Variable(labels)
 
+
             # compute y_pred
             y_pred = self.model(image_var)
+            # print("-----y_pred: -----", y_pred)
             loss = self.criterion(y_pred, label_var)
+            # print("-----label_var: -----", label_var.topk(int(label_var.size().__getitem__(0)), 0))
+
+            # Get the index of the class
+            for j in range(int(label_var.size().__getitem__(0))):
+                self.classes.append([int('{}'.format(label_var[j].data))])
 
             # measure accuracy and record loss
-            prec1, prec5 = accuracy(y_pred.data, labels, topk=(1, 5))
+            if self.num_classes<=5:
+                topkmax = self.num_classes
+            else:
+                topkmax = 5
+            prec1, prec5 = accuracy(y_pred.data, labels, topk=(1, topkmax))
             losses.update(loss.item(), images.size(0))
             acc.update(prec1.item(), images.size(0))
             top1.update(prec1.item(), images.size(0))
@@ -161,11 +179,11 @@ class Testing(object):
                 print('TestVal: [{0}/{1}]\t'
                       'Loss {loss.val:.4f} ({loss.avg:.4f})\t'
                       'Prec@1 {top1.val:.3f} ({top1.avg:.3f})\t'
-                      'Prec@5 {top5.val:.3f} ({top5.avg:.3f})'.format(
+                      'Prec@3 {top5.val:.3f} ({top5.avg:.3f})'.format(
                     i, len(self.test_loader), loss=losses, top1=top1, top5=top5))
 
         print(
-            ' * Accuracy {acc.avg:.3f}  Acc@5 {top5.avg:.3f} Loss {loss.avg:.3f}'.format(acc=acc, top5=top5,
+            ' * Accuracy {acc.avg:.3f}  Acc@3 {top5.avg:.3f} Loss {loss.avg:.3f}'.format(acc=acc, top5=top5,
                                                                                          loss=losses))
 
         end_time = time.clock()
@@ -175,6 +193,9 @@ class Testing(object):
             ' * Accuracy {acc.avg:.3f}  Acc@5 {top5.avg:.3f} Loss {loss.avg:.3f}'.format(acc=acc, top5=top5,
                                                                                          loss=losses))
 
-
+        # print("Video_prec: ")
+        # for i in range(len(self.classes)):
+        #     label = list(self.label_dict.keys())[list(self.label_dict.values()).index(self.classes[i][0])]
+        #     print("{video: <70s} ==> {label: <30s}".format(video=self.video_dict[i], label=label))
 
 

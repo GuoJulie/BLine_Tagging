@@ -15,14 +15,16 @@ np.set_printoptions(threshold=sys.maxsize)
 class DICOMReader:
     """
     This class reads a DICOM file and extract all its images to a folder.
-    All images are extracted without compression and in the TIFF format.
+    All images are extracted with compression of parameter SizeVideo and in the TIFF format.
+    All image converted videos are in avi format.
     """
 
     def __init__(self, inputPath_DICOM, outputPath_VideoCut, n_gBline, tempnamelist, DEBUG=False):
         """
-        Read the DICOM file, store the number of image and it's size
         :param inputPath_DICOM: path of the dicom file
         :param outputPath_VideoCut: path of the folder where the generated videos are located
+        :param n_gBline: The predicted position of the video in Bline0?0? (the ?th group video in folder Bline0?0?)
+        :param tempnamelist: a few columns in the excel file --> [excel[0], excel[1], excel[2]]
         :return list(Filenames of the cut videos)
         """
         self.pathDicom = inputPath_DICOM
@@ -52,16 +54,23 @@ class DICOMReader:
 
 
     def get_dicom_details(self):
+        '''
+        Get some information about DICOM files
+        :return: Number of images in DICOM file, image length and width
+        '''
         if self.DEBUG:
             print(self.nb_images, "images", "height", self.height, "width", self.width)
 
         return self.nb_images, self.height, self.width
 
 
-    # image pixel: 300*300
     def extract_images_opencv_dev(self, save_to_file=False):
-
-        print("4_temp_img_path: ")
+        '''
+        Read the images in DICOM and save them in the folder
+        resize image pixel with 300*300 (SizeVideo)
+        :param save_to_file: True / False
+        :return array_image: the read image is stored in an array
+        '''
 
         array_image = []
 
@@ -93,36 +102,25 @@ class DICOMReader:
         return array_image
 
 
-    #  4 frames par un video
     def extract_videos_opencv_dev(self, save_to_file=False):
-
-        # temp_imgdir_path = os.path.dirname(self.path) + '/' + os.path.split(self.path)[1] + '_Images/' + self.filename + "_images"
-        # temp_videodir_path = os.path.dirname(self.path) + '/' + os.path.split(self.path)[1] + '_Videos'
-
-
-        # create a folder
-        # if not os.path.isdir(temp_videodir_path) and save_to_file:
-        #     os.mkdir(temp_videodir_path)
+        '''
+        Convert Image to video based on Fps and VideoDuration, and save the video path to the videonamelist
+        :param save_to_file: True / False
+        :return:
+        '''
 
         filenum = len([lists for lists in os.listdir(self.temp_imgdir_path) if os.path.isfile(os.path.join(self.temp_imgdir_path, lists))])
 
-
-        # Fps = 10
         size = (SizeVideo[0], SizeVideo[1])
         fourcc = cv2.VideoWriter_fourcc(*'XVID')
-        # VideoDuration = 10
         n = int(math.floor(filenum / (Fps * VideoDuration)))
         print("filenum = ", filenum)
         print("n = ", n)
-
-        # videoWriter = cv2.VideoWriter(temp_videodir_path + '/' + self.filename + '.avi', fourcc, Fps, size)
-        # videoWriter = cv2.VideoWriter(temp_videodir_path + '/' + self.filename + '.mp4', -1, Fps, size)
 
         self.videonamelist = []
 
         for i in range(1, n+1):
             videoName = "v_" + self.videofoldername + "_g" + "%03d" % self.n_gBline + "_c" + "%02d" % i + "_" + self.tempnamelist[0] + "_" + self.tempnamelist[1] + "_" + self.tempnamelist[2] + ".avi"
-            # videoWriter = cv2.VideoWriter(temp_videodir_path + '/' + self.filename + '_c0' + str(i) + '.mp4', -1, Fps, size)
             videoWriter = cv2.VideoWriter(self.pathVideoFolder + '/' + videoName, fourcc, Fps, size)
             for j in range((i-1)*VideoDuration*Fps,i*VideoDuration*Fps):
                 file_path = self.temp_imgdir_path + '/' + self.filename + '_' + str(j) + '.tiff'
@@ -130,22 +128,16 @@ class DICOMReader:
                 videoWriter.write(frame)
             videoWriter.release()
 
-            # 追加符合 trainlist.txt / testlist.txt 格式的视频路径 及 classid
-            classInd = ['Bline0104', 'Bline0507', 'Bline0810', 'BlineBlanc']
-            self.videonamelist.append(self.videofoldername + "/" + videoName + " " + str(1 + classInd.index(self.videofoldername)))
+            # classInd = ['Bline0104', 'Bline0507', 'Bline0810', 'BlineBlanc']
+            # self.videonamelist.append(self.videofoldername + "/" + videoName + " " + str(1 + classInd.index(self.videofoldername)))
+
+            self.videonamelist.append(self.videofoldername + "/" + videoName)
 
             if self.DEBUG:
                 print(videoName + ' saved to', self.pathVideoFolder)
 
-        shutil.rmtree(self.temp_imgdir_path) # 删除 DICOM 对应的 image 文件夹
+        shutil.rmtree(self.temp_imgdir_path) # Delete the image folder corresponding to DICOM
 
-
-        # for i in range(0, filenum):
-        #     file_path = self.temp_imgdir_path + '/' + self.filename + '_' + str(i) + '.tiff'
-        #     frame = cv2.imread(file_path)
-        #     videoWriter.write(frame)
-        # videoWriter.release()
-        #
         # if self.DEBUG:
         #     print(self.filename + '.avi saved to', os.path.split(self.path)[1] + '_Videos')
 
@@ -156,16 +148,12 @@ if __name__ == "__main__":
     # root.withdraw()
     # file_path = filedialog.askopenfilename()
 
+    # test - delete
     inputPath_DICOM = "E:/S9_PRD/BLine_Tagging/Dataset/Centre 1 Tours/1Patient 1CP01/101M0/2019010A"
     outputPath_VideoCut = "E:/S9_PRD/BLine_Tagging/Dataset/LungBline/Bline0507"
     n_gBline0507 = 1
     tempnamelist = ["1Patient 1CP01", "M0", "2019010A"]
 
-    # reader = DICOMReader(file_path, True)
     reader = DICOMReader(inputPath_DICOM, outputPath_VideoCut, n_gBline0507, tempnamelist, True)
-    # reader.get_dicom_details()
-    # # reader.extract_images_opencv_dev(True)
-    # reader.extract_images_opencv_dev(True)
-    # reader.extract_videos_opencv_dev(True)
 
 
