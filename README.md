@@ -43,19 +43,17 @@ python DatasetPrepare.py
 ### Run Code
 1, For Training from scratch
 ```
-python main.py /path/data 
+python main.py /path/data --data-set=LungBline
 ```
-2, For Fine-tuning
+
+2, For Evaluate model
 ```
-python main.py /path/data --pretrained
+python main.py /path/data --data-set=LungBline --resume=checkpoint.pth.tar --evaluate 
 ```
-3, For Evaluate model
+
+3, For testing model
 ```
-python main.py /path/data --resume=checkpoint.pth.tar --evaluate 
-```
-4, For testing model
-```
-python main.py /path/data --test 
+python main.py /path/data --data-set=LungBline --test 
 ```
 
 
