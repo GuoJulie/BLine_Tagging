@@ -15,16 +15,21 @@ This repo implements the network structure of P3D[1] with PyTorch, pre-trained m
 
 ### Pretrained weights
 
-1, P3D-199 trained on Kinetics dataset:
+Les liens suivants comprennent l'ensemble de données d'origine, l'ensemble de données prétraitées, le modèle entraîné et les résultats d'apprentissage. 
+(Le nombre 3 ou 4 de sous-titre est le nombre de catégories dans un ensemble de données)
 
+1, LungBline-4: (Bline0104, Bline0507, Bline0810, BlineBlanc)
+ [Google Drive url](https://drive.google.com/drive/folders/1u_l-yvhS0shpW6e0tCiqPE7Bd1qQZKdD)
+
+2, UCF101-3:
+ [Google Drive url](https://drive.google.com/drive/folders/1u_l-yvhS0shpW6e0tCiqPE7Bd1qQZKdD)
+
+3, LungBline-3: (Bline0104, Bline0507, Bline0810)
  [Google Drive url](https://drive.google.com/drive/folders/1u_l-yvhS0shpW6e0tCiqPE7Bd1qQZKdD)
  
-2, P3D-199 trianed on Kinetics Optical Flow (TVL1):
-
- [Google Drive url](https://drive.google.com/drive/folders/1u_l-yvhS0shpW6e0tCiqPE7Bd1qQZKdD)
-
  
 ### Prepare Dataset LungBline
+
 First, download the dataset DICOM "Centre 1 Tours" from ??? into the "Dataset" folder.
 
 Next run scripts in the folder "DatasetTraitement" to create dataset LungBline 
@@ -33,6 +38,7 @@ and extract image frames from videos (folder - Data);
 ```
 python DatasetPrepare.py
 ```
+
 
 ### Run Code
 1, For Training from scratch
@@ -51,6 +57,7 @@ python main.py /path/data --resume=checkpoint.pth.tar --evaluate
 ```
 python main.py /path/data --test 
 ```
+
 
 ### Experiment Result From Us
 Dataset | Accuracy
