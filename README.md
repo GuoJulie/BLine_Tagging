@@ -13,7 +13,7 @@ This repo implements the network structure of P3D[1] with PyTorch, pre-trained m
 - numpy
 - ffmpeg (for extract image frames from videos)
 
-### Pretrained weights
+### Datasets and Pretrained weights
 
 Les liens suivants comprennent l'ensemble de données d'origine, l'ensemble de données prétraitées, le modèle entraîné et les résultats d'apprentissage. 
 (Le nombre 3 ou 4 de sous-titre est le nombre de catégories dans un ensemble de données)
