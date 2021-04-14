@@ -40,7 +40,7 @@ python DatasetPrepare.py
 ```
 
 
-### Run Code
+### Start deep learning
 1, For Training from scratch
 ```
 python main.py /path/data --data-set=LungBline
