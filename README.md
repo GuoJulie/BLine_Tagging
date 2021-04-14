@@ -4,7 +4,7 @@
 
 ## Pseudo-3D Residual Networks
 
-This repo implements the network structure of P3D[1] with PyTorch, pre-trained model weights are converted from caffemodel, which is supported from the [author's repo](https://github.com/ZhaofanQiu/pseudo-3d-residual-networks)
+This repo implements the network structure of P3D[1] with PyTorch, pre-trained model weights are converted from caffemodel, which is supported from the [author's repo -1](https://github.com/ZhaofanQiu/pseudo-3d-residual-networks) and [author's repo -2](https://github.com/naviocean/pseudo-3d-pytorch)
 
 
 ### Requirements:
@@ -30,7 +30,7 @@ Les liens suivants comprennent l'ensemble de données d'origine, l'ensemble de d
  
 ### Prepare Dataset LungBline
 
-First, download the dataset DICOM "Centre 1 Tours" from [M.Nicolas Ragot](nicolas.ragot@univ-tours.fr) into the "Dataset" folder.
+First, download the dataset DICOM "Centre 1 Tours" from [M.Nicolas Ragot](https://www.univ-tours.fr/annuaire/m-nicolas-ragot) into the "Dataset" folder.
 
 Next run scripts in the folder "DatasetTraitement" to create dataset LungBline 
 dataset: LungBine (video: folder - "LungBline", list: folder - lungblineTrainTestlist)
@@ -68,5 +68,3 @@ UCF-101(3) | 54.167 | 1.300
 ### Reference:
 
  [1][Learning Spatio-Temporal Representation with Pseudo-3D Residual,ICCV2017](http://openaccess.thecvf.com/content_iccv_2017/html/Qiu_Learning_Spatio-Temporal_Representation_ICCV_2017_paper.html)
- 
- [2][naviocean --> pseudo-3d-pytorch](https://github.com/naviocean/pseudo-3d-pytorch)
